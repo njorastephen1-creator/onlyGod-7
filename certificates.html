@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certificates - Kingdom Seekers Fellowship</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', sans-serif; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 20px; padding: 30px; }
+    .header { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px; }
+    .header h1 { font-size: 28px; margin-bottom: 10px; }
+    .stats { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 12px; margin-bottom: 30px; text-align: center; }
+    .stats h2 { font-size: 36px; }
+    .student-list { margin-top: 20px; }
+    .student-card { border: 2px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 15px 0; background: white; }
+    .student-card h3 { color: #2d3748; margin-bottom: 10px; }
+    .student-card p { color: #64748b; margin: 5px 0; font-size: 14px; }
+    .class-badge { display: inline-block; background: #e0e7ff; color: #667eea; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-top: 8px; }
+    .grad-badge { display: inline-block; background: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-left: 8px; }
+    .btn { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 15px; font-size: 14px; }
+    .btn:hover { transform: translateY(-2px); }
+    .loading { text-align: center; padding: 40px; color: #64748b; font-size: 16px; }
+    .error { background: #fee2e2; color: #dc2626; padding: 20px; border-radius: 12px; margin: 20px 0; }
+    .success { background: #d1fae5; color: #059669; padding: 15px; border-radius: 8px; margin: 10px 0; }
+    @media (max-width: 768px) { .container { padding: 15px; } .header h1 { font-size: 24px; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎓 Certificate Generator</h1>
+      <p>Kingdom Seekers Fellowship - Discipleship Program</p>
+    </div>
+    
+    <div class="stats">
+      <h2 id="totalCount">0</h2>
+      <p>Students Graduated</p>
+    </div>
+
+    <div id="status"></div>
+    <div id="studentList" class="student-list"></div>
+  </div>
+
+  <script>
+    console.log('=== CERTIFICATE GENERATOR LOADING ===');
+    
+    // SAME Firebase config as main tracker
+    const firebaseConfig = {
+      apiKey: "AIzaSyCdSvUk6qpC857ZJfaDbniDlOKvWXPYYXY",
+      authDomain: "discipleship-dashboard-4d713.firebaseapp.com",
+      databaseURL: "https://discipleship-dashboard-4d713-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "discipleship-dashboard-4d713",
+      storageBucket: "discipleship-dashboard-4d713.firebasestorage.app",
+      messagingSenderId: "27738663604",
+      appId: "1:27738663604:web:bf1898247e0dd5a37805e1"
+    };
+
+    try {
+      firebase.initializeApp(firebaseConfig);
+      console.log('✅ Firebase initialized');
+      const database = firebase.database();
+      
+      // Load students - SAME WAY as main tracker
+      database.ref('students').once('value', snapshot => {
+        console.log('📥 Students loaded');
+        const studentsData = snapshot.val() || {};
+        const students = [];
+        
+        Object.keys(studentsData).forEach(id => {
+          const student = studentsData[id];
+          
+          // Check if graduated
+          if (student.graduationDate || student.status === 'graduated') {
+            students.push({ id, ...student });
+            console.log('✅ Found graduate:', student.name);
+          }
+        });
+        
+        console.log('Total graduates:', students.length);
+        displayGraduates(students);
+      }).catch(error => {
+        console.error('❌ Error:', error);
+        document.getElementById('status').innerHTML = 
+          '<div class="error">Error loading students: ' + error.message + '</div>';
+      });
+      
+    } catch (error) {
+      console.error('❌ Firebase error:', error);
+      document.getElementById('status').innerHTML = 
+        '<div class="error">Firebase error: ' + error.message + '</div>';
+    }
+
+    function displayGraduates(students) {
+      document.getElementById('totalCount').textContent = students.length;
+      
+      if (students.length === 0) {
+        document.getElementById('studentList').innerHTML = 
+          '<div class="loading">No graduated students yet</div>';
+        return;
+      }
+      
+      document.getElementById('status').innerHTML = 
+        '<div class="success">Found ' + students.length + ' graduate(s)</div>';
+      
+      const html = students.map(student => {
+        const date = student.graduationDate ? new Date(student.graduationDate).toLocaleDateString('en-GB', {
+          day: 'numeric', month: 'long', year: 'numeric'
+        }) : 'N/A';
+        
+        return '<div class="student-card">' +
+          '<h3>' + student.name + '</h3>' +
+          '<p><span class="class-badge">Class ' + student.class + '</span> <span class="grad-badge">✓ Graduated</span></p>' +
+          '<p>📞 ' + (student.phone || 'N/A') + '</p>' +
+          '<p>📅 Graduated: ' + date + '</p>' +
+          '<p>📚 Cohort: ' + (student.cohort || 'N/A') + '</p>' +
+          '<button class="btn" onclick="generateCertificate(\'' + student.id + '\')">🎓 Generate Certificate</button>' +
+          '</div>';
+      }).join('');
+      
+      document.getElementById('studentList').innerHTML = html;
+    }
+
+    function generateCertificate(studentId) {
+      alert('Certificate generation started for student ID: ' + studentId);
+      // Full PDF generation code will go here
+    }
+  </script>
+</body>
+</html>
